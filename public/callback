@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spotify Sign-In</title>
+  </head>
+  <body style="margin:0;background:#071735;color:#f4f7ff;font:16px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:grid;place-items:center;min-height:100vh;">
+    <p>Finishing Spotify sign-in...</p>
+    <script>
+      (function () {
+        var target = '/' + window.location.search + window.location.hash;
+        window.location.replace(target);
+      })();
+    </script>
+  </body>
+</html>
