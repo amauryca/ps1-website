@@ -213,6 +213,7 @@ export default function App() {
   const [albumTrackQuery, setAlbumTrackQuery] = useState('');
   const [artistLoading, setArtistLoading] = useState(false);
   const [artistError, setArtistError] = useState('');
+  const [focusMode, setFocusMode] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
   const [lyricsLoading, setLyricsLoading] = useState(false);
@@ -290,6 +291,18 @@ export default function App() {
 
     setStatus('Spotify connected, preparing playback device');
   }, [connected, player.error, player.ready, player.webPlaybackUnavailable]);
+
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      setFocusMode(false);
+    }
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
 
   useEffect(() => {
     if (!player.state) {
@@ -779,7 +792,7 @@ export default function App() {
 
   return (
     <div
-      className="app-shell"
+      className={`app-shell${focusMode ? ' focus-mode' : ''}`}
       style={{
         ['--mesh-a' as string]: palette.a,
         ['--mesh-b' as string]: palette.b,
@@ -788,8 +801,13 @@ export default function App() {
     >
       <div className="mesh" />
 
+      {focusMode && (
+        <button type="button" className="focus-exit-btn" onClick={() => setFocusMode(false)}>
+          Show UI
+        </button>
+      )}
+
       <header className="topbar">
-        <button type="button" className="close" aria-label="Close">×</button>
         <div className="topbar-right">
           <div className="status-chip">
             <span className={`status-dot ${connected ? 'online' : 'offline'}`} />
@@ -809,6 +827,14 @@ export default function App() {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            className={`utility-btn${focusMode ? ' active' : ''}`}
+            onClick={() => setFocusMode((current) => !current)}
+            aria-pressed={focusMode}
+          >
+            {focusMode ? 'Show UI' : 'Clear Screen'}
+          </button>
         </div>
       </header>
 
@@ -865,72 +891,77 @@ export default function App() {
                   {!artistLoading && artistError && <p className="search-hint">{artistError}</p>}
 
                   {!artistLoading && selectedArtistAlbums.length > 0 && (
-                    <div className="artist-albums">
-                      <p className="search-section-label">Albums</p>
-                      <div className="album-strip">
-                        {selectedArtistAlbums.map((album) => (
-                          <button
-                            key={album.id}
-                            type="button"
-                            className={`album-card${selectedAlbumId === album.id ? ' active' : ''}`}
-                            onClick={() => void handlePickAlbum(album.id)}
-                          >
-                            <div className="result-art album-art">
-                              {album.image ? <img src={album.image} alt="" aria-hidden="true" /> : <div className="result-art-placeholder" />}
-                            </div>
-                            <span className="album-name">{album.name}</span>
-                          </button>
-                        ))}
+                    <div className="discography-split">
+                      <div className="album-col">
+                        <p className="search-section-label">Albums</p>
+                        <div className="album-list">
+                          {selectedArtistAlbums.map((album) => (
+                            <button
+                              key={album.id}
+                              type="button"
+                              className={`album-row${selectedAlbumId === album.id ? ' active' : ''}`}
+                              onClick={() => void handlePickAlbum(album.id)}
+                            >
+                              <div className="album-row-art">
+                                {album.image ? <img src={album.image} alt="" aria-hidden="true" /> : <div className="result-art-placeholder" />}
+                              </div>
+                              <div className="album-row-info">
+                                <span className="album-row-name">{album.name}</span>
+                                <span className="album-row-year">{album.releaseDate.slice(0, 4)}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
 
-                  {!artistLoading && selectedAlbumTracks.length > 0 && (
-                    <div className="artist-tracks">
-                      <div className="artist-tracks-header">
-                        <p className="search-section-label">Songs</p>
-                        <input
-                          className="album-track-search"
-                          type="search"
-                          placeholder="Filter songs in this album"
-                          value={albumTrackQuery}
-                          onChange={(event) => setAlbumTrackQuery(event.currentTarget.value)}
-                          aria-label="Filter songs in selected album"
-                        />
-                      </div>
-                      <div className="track-list">
-                        {filteredAlbumTracks.map((track) => (
-                          <div key={track.id} className="track-item">
-                            <span className="track-number">{track.trackNumber}</span>
-                            <span className="track-title">{track.name}</span>
-                            <span className="track-duration">{formatTime(track.durationMs / 1000)}</span>
-                            <div className="track-actions">
-                              <button
-                                type="button"
-                                className="track-action-btn"
-                                onClick={() => void handlePlayResult(track.uri)}
-                              >
-                                Play
-                              </button>
-                              <button
-                                type="button"
-                                className="track-action-btn secondary"
-                                onClick={() => void handleQueueTrack(track.uri)}
-                              >
-                                Queue
-                              </button>
+                      <div className="track-col">
+                        {selectedAlbumTracks.length > 0 ? (
+                          <>
+                            <div className="artist-tracks-header">
+                              <p className="search-section-label">Songs</p>
+                              <input
+                                className="album-track-search"
+                                type="search"
+                                placeholder="Filter…"
+                                value={albumTrackQuery}
+                                onChange={(event) => setAlbumTrackQuery(event.currentTarget.value)}
+                                aria-label="Filter songs in selected album"
+                              />
                             </div>
-                          </div>
-                        ))}
-                        {filteredAlbumTracks.length === 0 && (
-                          <p className="search-hint">No songs match this filter</p>
+                            <div className="track-list">
+                              {filteredAlbumTracks.map((track) => (
+                                <div key={track.id} className="track-item">
+                                  <span className="track-number">{track.trackNumber}</span>
+                                  <span className="track-title">{track.name}</span>
+                                  <span className="track-duration">{formatTime(track.durationMs / 1000)}</span>
+                                  <div className="track-actions">
+                                    <button
+                                      type="button"
+                                      className="track-action-btn"
+                                      onClick={() => void handlePlayResult(track.uri)}
+                                    >
+                                      Play
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="track-action-btn secondary"
+                                      onClick={() => void handleQueueTrack(track.uri)}
+                                    >
+                                      Queue
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              {filteredAlbumTracks.length === 0 && (
+                                <p className="search-hint">No songs match</p>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <p className="search-hint" style={{ paddingTop: 40 }}>← Pick an album</p>
                         )}
                       </div>
                     </div>
-                  )}
-
-                  {!artistLoading && selectedArtistAlbums.length > 0 && selectedAlbumTracks.length === 0 && (
-                    <p className="search-hint">Pick an album to load its songs</p>
                   )}
                 </div>
               ) : (

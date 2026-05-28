@@ -258,8 +258,7 @@ export async function handleSpotifyRedirect() {
 
   url.searchParams.delete('code');
   url.searchParams.delete('state');
-  const nextPath = `${url.pathname}${url.search}${url.hash}`;
-  window.history.replaceState({}, document.title, nextPath || '/');
+  window.history.replaceState({}, document.title, '/');
   return exchangeCodeForTokens(code);
 }
 
@@ -316,19 +315,18 @@ async function fetchPlaybackDevices(accessToken: string): Promise<SpotifyDevice[
 }
 
 async function ensurePlaybackDevice(accessToken: string, preferredDeviceId: string | null): Promise<string | null> {
+  // If we have the Web Playback SDK device ID, use it directly — it's valid
+  // as soon as the 'ready' event fires and avoids a race with the devices API
+  // (the browser device can take several seconds to appear in that list).
+  if (preferredDeviceId) {
+    return preferredDeviceId;
+  }
+
   const devices = await fetchPlaybackDevices(accessToken);
   const availableDevices = devices.filter((device) => !device.is_restricted);
 
   if (availableDevices.length === 0) {
     return null;
-  }
-
-  const preferred = preferredDeviceId ? availableDevices.find((device) => device.id === preferredDeviceId) : null;
-  if (preferred) {
-    if (!preferred.is_active) {
-      await transferPlaybackToDevice(preferred.id, false);
-    }
-    return preferred.id;
   }
 
   const activeDevice = availableDevices.find((device) => device.is_active);

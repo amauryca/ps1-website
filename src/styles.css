@@ -97,7 +97,76 @@ button {
 .topbar-right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.utility-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(8, 14, 34, 0.36);
+  color: rgba(226, 238, 255, 0.84);
+  font-size: 0.78rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: transform 170ms var(--ease-smooth), background-color 220ms var(--ease-smooth), border-color 220ms var(--ease-smooth);
+}
+
+.utility-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(10, 20, 48, 0.48);
+}
+
+.utility-btn.active {
+  background: rgba(143, 247, 221, 0.18);
+  border-color: rgba(143, 247, 221, 0.36);
+  color: rgba(236, 249, 255, 0.96);
+}
+
+.focus-exit-btn {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  z-index: 9;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: rgba(8, 14, 34, 0.5);
+  color: rgba(236, 245, 255, 0.95);
+  font-size: 0.78rem;
+  font-weight: 570;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: transform 160ms var(--ease-smooth), background-color 220ms var(--ease-smooth);
+}
+
+.focus-exit-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(14, 24, 58, 0.72);
+}
+
+.app-shell.focus-mode .mesh {
+  opacity: 0.45;
+}
+
+.app-shell.focus-mode .topbar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px);
+  transition: opacity 220ms var(--ease-smooth);
+}
+
+.app-shell.focus-mode {
+  padding-top: 10px;
+}
+
+.app-shell.focus-mode main {
+  min-height: calc(100vh - 24px);
 }
 
 .view-tabs {
@@ -119,7 +188,11 @@ button {
   font-size: 0.82rem;
   font-weight: 540;
   cursor: pointer;
-  transition: background 200ms var(--ease-smooth), color 200ms var(--ease-smooth);
+  transition: background 200ms var(--ease-smooth), color 200ms var(--ease-smooth), transform 160ms var(--ease-smooth);
+}
+
+.view-tab:active {
+  transform: scale(0.94);
 }
 
 .view-tab.active {
@@ -281,6 +354,7 @@ button {
   overflow-y: auto;
   max-height: calc(100vh - 130px);
   padding-right: 4px;
+  animation: fadeSlideUp 220ms var(--ease-smooth) both;
 }
 
 .search-section-label {
@@ -312,7 +386,12 @@ button {
   text-align: left;
   cursor: default;
   width: 100%;
-  transition: background 160ms var(--ease-smooth), border-color 160ms var(--ease-smooth);
+  transition: background 160ms var(--ease-smooth), border-color 160ms var(--ease-smooth), transform 160ms var(--ease-smooth);
+  animation: fadeSlideUp 220ms var(--ease-smooth) both;
+}
+
+.search-result:active {
+  transform: scale(0.98);
 }
 
 .search-result:hover {
@@ -343,6 +422,93 @@ button {
   flex-direction: column;
   gap: 16px;
   width: 100%;
+  animation: fadeSlideUp 260ms var(--ease-smooth) both;
+}
+
+.discography-split {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.album-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.album-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.album-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 160ms var(--ease-smooth), border-color 160ms var(--ease-smooth), transform 160ms var(--ease-smooth);
+}
+
+.album-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.album-row.active {
+  background: rgba(143, 247, 221, 0.09);
+  border-color: rgba(143, 247, 221, 0.25);
+}
+
+.album-row-art {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.album-row-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.album-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.album-row-name {
+  font-size: 0.82rem;
+  font-weight: 560;
+  color: rgba(240, 244, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-row-year {
+  font-size: 0.72rem;
+  color: rgba(200, 218, 255, 0.5);
+}
+
+.track-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  animation: fadeSlideUp 220ms var(--ease-smooth) both;
 }
 
 .artist-banner {
@@ -353,6 +519,7 @@ button {
   border-radius: 16px;
   background: rgba(8, 10, 18, 0.58);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  animation: fadeSlideUp 240ms var(--ease-smooth) both;
 }
 
 .artist-banner-art {
@@ -466,10 +633,13 @@ button {
   padding: 10px 12px;
   cursor: default;
   text-align: left;
+  animation: fadeSlideUp 200ms var(--ease-smooth) both;
+  transition: background 160ms var(--ease-smooth), border-color 160ms var(--ease-smooth);
 }
 
 .track-item:hover {
   background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .track-number {
@@ -508,6 +678,11 @@ button {
   letter-spacing: 0.01em;
   padding: 5px 10px;
   cursor: pointer;
+  transition: background 160ms var(--ease-smooth), border-color 160ms var(--ease-smooth), transform 120ms var(--ease-smooth);
+}
+
+.track-action-btn:active {
+  transform: scale(0.92);
 }
 
 .track-action-btn.secondary {
@@ -614,6 +789,65 @@ button {
   gap: 12px;
   width: 100%;
   max-width: 520px;
+}
+
+.left-panel .artwork-wrap {
+  width: min(100%, 360px);
+  animation: none;
+}
+
+.left-panel .title-block,
+.left-panel .progress-area {
+  width: min(100%, 360px);
+}
+
+.left-panel .title-block h2 {
+  font-size: clamp(1.35rem, 1.8vw, 1.85rem);
+}
+
+.left-panel .title-block p {
+  font-size: 0.92rem;
+}
+
+.left-panel .time-row {
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+}
+
+.left-panel .controls-row {
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.left-panel .control {
+  width: 36px;
+  height: 36px;
+  font-size: 0.9rem;
+}
+
+.left-panel .control.big {
+  width: 46px;
+  height: 46px;
+  font-size: 1.05rem;
+}
+
+.left-panel .control.mini {
+  width: 26px;
+  height: 26px;
+  font-size: 0.75rem;
+}
+
+.left-panel .volume-row {
+  margin-top: 8px;
+}
+
+.left-panel .actions {
+  margin-top: 10px;
+}
+
+.left-panel .pill {
+  padding: 7px 11px;
+  font-size: 0.76rem;
 }
 
 .artwork-wrap {
@@ -929,6 +1163,22 @@ button {
   transform: translateX(3px);
 }
 
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @keyframes meshDrift {
   0% {
     transform: scale(1.08) translate3d(-1.2%, -0.6%, 0);
@@ -988,7 +1238,9 @@ button {
   .close,
   .lyric,
   .artwork,
-  .progress-fill {
+  .progress-fill,
+  .utility-btn,
+  .focus-exit-btn {
     transition: none;
   }
 }
