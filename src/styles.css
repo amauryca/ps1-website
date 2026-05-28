@@ -757,6 +757,12 @@ button {
   margin: 0;
 }
 
+.artist-tracks-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .album-track-search {
   width: min(100%, 280px);
   padding: 8px 10px;
@@ -771,6 +777,31 @@ button {
 
 .album-track-search:focus {
   border-color: rgba(143, 247, 221, 0.44);
+}
+
+.album-play-all-btn {
+  border: 1px solid rgba(143, 247, 221, 0.34);
+  border-radius: 999px;
+  background: rgba(143, 247, 221, 0.2);
+  color: rgba(244, 252, 255, 0.95);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 160ms var(--ease-smooth), background 180ms var(--ease-smooth), border-color 180ms var(--ease-smooth);
+}
+
+.album-play-all-btn:hover:not(:disabled) {
+  border-color: rgba(143, 247, 221, 0.52);
+  background: rgba(143, 247, 221, 0.34);
+  transform: translateY(-1px);
+}
+
+.album-play-all-btn:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
 }
 
 .track-item {

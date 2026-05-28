@@ -226,6 +226,7 @@ export default function App() {
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [selectedAlbumTracks, setSelectedAlbumTracks] = useState<AlbumTrackResult[]>([]);
   const [albumTrackQuery, setAlbumTrackQuery] = useState('');
+  const [albumPlayLoading, setAlbumPlayLoading] = useState(false);
   const [artistLoading, setArtistLoading] = useState(false);
   const [artistError, setArtistError] = useState('');
   const [reportTitle, setReportTitle] = useState('');
@@ -763,6 +764,33 @@ export default function App() {
     }
   }
 
+  async function handlePlayAlbum() {
+    if (selectedAlbumTracks.length === 0) {
+      setStatus('No album tracks to play');
+      return;
+    }
+
+    setAlbumPlayLoading(true);
+    try {
+      const [firstTrack, ...remainingTracks] = selectedAlbumTracks;
+      await playTrackUri(firstTrack.uri, player.deviceId);
+      for (const track of remainingTracks) {
+        await queueTrackUri(track.uri, player.deviceId);
+      }
+
+      setStatus(
+        remainingTracks.length > 0
+          ? `Playing album and queued ${remainingTracks.length} more`
+          : 'Playing album',
+      );
+      setView('song');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Unable to play album');
+    } finally {
+      setAlbumPlayLoading(false);
+    }
+  }
+
   function handleSubmitBugReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedTitle = reportTitle.trim();
@@ -1130,14 +1158,24 @@ export default function App() {
                           <>
                             <div className="artist-tracks-header">
                               <p className="search-section-label">Songs</p>
-                              <input
-                                className="album-track-search"
-                                type="search"
-                                placeholder="Filter…"
-                                value={albumTrackQuery}
-                                onChange={(event) => setAlbumTrackQuery(event.currentTarget.value)}
-                                aria-label="Filter songs in selected album"
-                              />
+                              <div className="artist-tracks-actions">
+                                <input
+                                  className="album-track-search"
+                                  type="search"
+                                  placeholder="Filter…"
+                                  value={albumTrackQuery}
+                                  onChange={(event) => setAlbumTrackQuery(event.currentTarget.value)}
+                                  aria-label="Filter songs in selected album"
+                                />
+                                <button
+                                  type="button"
+                                  className="album-play-all-btn"
+                                  onClick={() => void handlePlayAlbum()}
+                                  disabled={albumPlayLoading || selectedAlbumTracks.length === 0}
+                                >
+                                  {albumPlayLoading ? 'Playing…' : 'Play album'}
+                                </button>
+                              </div>
                             </div>
                             <div className="track-list">
                               {filteredAlbumTracks.map((track) => (
