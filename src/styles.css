@@ -302,7 +302,7 @@ button {
 
 .search-result {
   display: grid;
-  grid-template-columns: 44px 1fr auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
@@ -310,7 +310,7 @@ button {
   border: 1px solid transparent;
   border-radius: 10px;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
   width: 100%;
   transition: background 160ms var(--ease-smooth), border-color 160ms var(--ease-smooth);
 }
@@ -330,6 +330,7 @@ button {
   background: linear-gradient(180deg, rgba(12, 16, 28, 0.94), rgba(25, 30, 48, 0.92));
   border-color: rgba(255, 255, 255, 0.07);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  cursor: pointer;
 }
 
 .artist-art {
@@ -426,9 +427,36 @@ button {
   gap: 8px;
 }
 
+.artist-tracks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.artist-tracks-header .search-section-label {
+  margin: 0;
+}
+
+.album-track-search {
+  width: min(100%, 280px);
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  outline: none;
+}
+
+.album-track-search:focus {
+  border-color: rgba(143, 247, 221, 0.44);
+}
+
 .track-item {
   display: grid;
-  grid-template-columns: 24px 1fr auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -436,7 +464,7 @@ button {
   border-radius: 12px;
   background: rgba(4, 8, 18, 0.68);
   padding: 10px 12px;
-  cursor: pointer;
+  cursor: default;
   text-align: left;
 }
 
@@ -456,10 +484,43 @@ button {
   white-space: nowrap;
 }
 
-.track-action {
-  color: rgba(143, 247, 221, 0.82);
+.track-duration {
+  color: rgba(200, 218, 255, 0.5);
   font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.track-actions,
+.result-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.track-action-btn {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(143, 247, 221, 0.2);
+  color: rgba(244, 252, 255, 0.95);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.track-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.track-action-btn:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(143, 247, 221, 0.34);
+}
+
+.track-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .result-art {
@@ -974,5 +1035,36 @@ button {
 
   .status-chip {
     max-width: 62vw;
+  }
+
+  .search-result {
+    grid-template-columns: 44px minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  .result-duration,
+  .result-actions {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .track-item {
+    grid-template-columns: 24px minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  .track-duration,
+  .track-actions {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .artist-tracks-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .album-track-search {
+    width: 100%;
   }
 }

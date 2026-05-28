@@ -6,6 +6,7 @@ import {
   fetchAlbumTracks,
   fetchArtistAlbums,
   fetchQueueNextTrack,
+  getValidAccessToken,
   handleSpotifyRedirect,
   hasSpotifyConfig,
   loadSpotifyAuth,
@@ -209,6 +210,7 @@ export default function App() {
   const [selectedArtistAlbums, setSelectedArtistAlbums] = useState<ArtistAlbumResult[]>([]);
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [selectedAlbumTracks, setSelectedAlbumTracks] = useState<AlbumTrackResult[]>([]);
+  const [albumTrackQuery, setAlbumTrackQuery] = useState('');
   const [artistLoading, setArtistLoading] = useState(false);
   const [artistError, setArtistError] = useState('');
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -240,6 +242,32 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!connected) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getValidAccessToken();
+        if (!token && !cancelled) {
+          setConnected(false);
+          setStatus('Spotify session expired. Connect again.');
+        }
+      } catch {
+        if (!cancelled) {
+          setConnected(false);
+          setStatus('Spotify session expired. Connect again.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connected]);
+
+  useEffect(() => {
     if (player.error) {
       setStatus(player.error);
       return;
@@ -255,8 +283,13 @@ export default function App() {
       return;
     }
 
+    if (player.webPlaybackUnavailable) {
+      setStatus('Spotify connected in remote mode (web player unavailable in this runtime)');
+      return;
+    }
+
     setStatus('Spotify connected, preparing playback device');
-  }, [connected, player.error, player.ready]);
+  }, [connected, player.error, player.ready, player.webPlaybackUnavailable]);
 
   useEffect(() => {
     if (!player.state) {
@@ -602,6 +635,7 @@ export default function App() {
   async function handlePlayResult(uri: string) {
     try {
       await playTrackUri(uri, player.deviceId);
+      setView('song');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to play track');
     }
@@ -611,6 +645,7 @@ export default function App() {
     setSelectedArtist(artist);
     setSelectedAlbumId(null);
     setSelectedAlbumTracks([]);
+    setAlbumTrackQuery('');
     setArtistError('');
     setArtistLoading(true);
     try {
@@ -618,6 +653,7 @@ export default function App() {
       setSelectedArtistAlbums(albums);
       if (albums[0]) {
         setSelectedAlbumId(albums[0].id);
+        setSelectedAlbumTracks(await fetchAlbumTracks(albums[0].id));
       }
     } catch (error) {
       setSelectedArtistAlbums([]);
@@ -644,11 +680,21 @@ export default function App() {
   async function handleQueueTrack(uri: string) {
     try {
       await queueTrackUri(uri, player.deviceId);
-      setStatus('Queued track');
+      setStatus('Track queued (or started if nothing was playing)');
+      setView('song');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to queue track');
     }
   }
+
+  const filteredAlbumTracks = useMemo(() => {
+    const normalizedQuery = albumTrackQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return selectedAlbumTracks;
+    }
+
+    return selectedAlbumTracks.filter((track) => track.name.toLowerCase().includes(normalizedQuery));
+  }, [albumTrackQuery, selectedAlbumTracks]);
 
   // Debounced Spotify search
   useEffect(() => {
@@ -677,6 +723,7 @@ export default function App() {
         })
         .catch(() => {
           setSearchArtistResults([]);
+          setSearchResults([]);
           setSearchLoading(false);
         });
     }, 320);
@@ -840,20 +887,44 @@ export default function App() {
 
                   {!artistLoading && selectedAlbumTracks.length > 0 && (
                     <div className="artist-tracks">
-                      <p className="search-section-label">Songs</p>
+                      <div className="artist-tracks-header">
+                        <p className="search-section-label">Songs</p>
+                        <input
+                          className="album-track-search"
+                          type="search"
+                          placeholder="Filter songs in this album"
+                          value={albumTrackQuery}
+                          onChange={(event) => setAlbumTrackQuery(event.currentTarget.value)}
+                          aria-label="Filter songs in selected album"
+                        />
+                      </div>
                       <div className="track-list">
-                        {selectedAlbumTracks.map((track) => (
-                          <button
-                            key={track.id}
-                            type="button"
-                            className="track-item"
-                            onClick={() => void handleQueueTrack(track.uri)}
-                          >
+                        {filteredAlbumTracks.map((track) => (
+                          <div key={track.id} className="track-item">
                             <span className="track-number">{track.trackNumber}</span>
                             <span className="track-title">{track.name}</span>
-                            <span className="track-action">Queue next</span>
-                          </button>
+                            <span className="track-duration">{formatTime(track.durationMs / 1000)}</span>
+                            <div className="track-actions">
+                              <button
+                                type="button"
+                                className="track-action-btn"
+                                onClick={() => void handlePlayResult(track.uri)}
+                              >
+                                Play
+                              </button>
+                              <button
+                                type="button"
+                                className="track-action-btn secondary"
+                                onClick={() => void handleQueueTrack(track.uri)}
+                              >
+                                Queue
+                              </button>
+                            </div>
+                          </div>
                         ))}
+                        {filteredAlbumTracks.length === 0 && (
+                          <p className="search-hint">No songs match this filter</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -890,11 +961,9 @@ export default function App() {
                   {connected && !searchLoading && searchResults.map((result) => {
                     const isPlaying = player.state?.contextUri === result.uri;
                     return (
-                      <button
+                      <div
                         key={result.uri}
-                        type="button"
                         className={`search-result${isPlaying ? ' playing' : ''}`}
-                        onClick={() => void handlePlayResult(result.uri)}
                       >
                         <div className="result-art">
                           {result.albumArt
@@ -906,7 +975,23 @@ export default function App() {
                           <span className="result-artist">{result.artist}</span>
                         </div>
                         <span className="result-duration">{formatTime(result.durationMs / 1000)}</span>
-                      </button>
+                        <div className="result-actions">
+                          <button
+                            type="button"
+                            className="track-action-btn"
+                            onClick={() => void handlePlayResult(result.uri)}
+                          >
+                            Play
+                          </button>
+                          <button
+                            type="button"
+                            className="track-action-btn secondary"
+                            onClick={() => void handleQueueTrack(result.uri)}
+                          >
+                            Queue
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </>

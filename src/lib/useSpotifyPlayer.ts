@@ -2,6 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getValidAccessToken, transferPlaybackToDevice } from './spotify';
 import type { SpotifyPlayerInstance, SpotifyPlayerState, SpotifySdk } from './spotifySdk';
 
+function isElectronRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const runtimeWindow = window as Window & { desktopApp?: unknown };
+  const userAgent = navigator.userAgent.toLowerCase();
+  return Boolean(runtimeWindow.desktopApp) || userAgent.includes('electron');
+}
+
 async function loadSpotifySdk() {
   if (window.Spotify) {
     return window.Spotify;
@@ -49,6 +59,7 @@ export function useSpotifyPlayer(enabled: boolean) {
   const [ready, setReady] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [webPlaybackUnavailable, setWebPlaybackUnavailable] = useState(false);
   const [state, setState] = useState<ReturnType<typeof mapState>>(null);
   const playerRef = useRef<SpotifyPlayerInstance | null>(null);
   const transferPerformed = useRef(false);
@@ -65,11 +76,23 @@ export function useSpotifyPlayer(enabled: boolean) {
         setReady(false);
         setDeviceId(null);
         setState(null);
+        setWebPlaybackUnavailable(false);
         transferPerformed.current = false;
         return;
       }
 
       try {
+        setError(null);
+
+        if (isElectronRuntime()) {
+          // Spotify's Web Playback SDK often cannot initialize in Electron due to DRM/EME constraints.
+          setWebPlaybackUnavailable(true);
+          setReady(false);
+          setDeviceId(null);
+          return;
+        }
+
+        setWebPlaybackUnavailable(false);
         const sdk = await loadSpotifySdk();
         if (cancelled || !sdk) {
           return;
@@ -95,7 +118,7 @@ export function useSpotifyPlayer(enabled: boolean) {
             if (!transferPerformed.current) {
               transferPerformed.current = true;
               try {
-                await transferPlaybackToDevice(device_id);
+                await transferPlaybackToDevice(device_id, false);
               } catch (transferError) {
                 setError(transferError instanceof Error ? transferError.message : 'Unable to transfer playback');
               }
@@ -107,14 +130,13 @@ export function useSpotifyPlayer(enabled: boolean) {
               return;
             }
 
-            if (device_id === deviceId) {
-              setReady(false);
-              setDeviceId(null);
-            }
+            setReady(false);
+            setDeviceId((currentDeviceId) => (currentDeviceId === device_id ? null : currentDeviceId));
           });
 
           player.addListener('initialization_error', ({ message }: { message: string }) => {
-            setError(message);
+            setWebPlaybackUnavailable(true);
+            setError(`Spotify Web Playback unavailable: ${message}`);
           });
 
           player.addListener('authentication_error', ({ message }: { message: string }) => {
@@ -210,6 +232,7 @@ export function useSpotifyPlayer(enabled: boolean) {
     ready,
     deviceId,
     error,
+    webPlaybackUnavailable,
     state,
     ...controls,
   };

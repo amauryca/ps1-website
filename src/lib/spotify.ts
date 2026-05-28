@@ -65,12 +65,37 @@ const storageKey = 'ps1_spotify_auth';
 const verifierKey = 'ps1_spotify_verifier';
 const redirectKey = 'ps1_spotify_redirect';
 
+function isLoopbackHost(hostname: string) {
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
 export function getSpotifyClientId() {
   return import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined;
 }
 
 export function getSpotifyRedirectUri() {
-  return (import.meta.env.VITE_SPOTIFY_REDIRECT_URI as string | undefined) ?? window.location.origin + '/';
+  const configuredRedirect = import.meta.env.VITE_SPOTIFY_REDIRECT_URI as string | undefined;
+  if (!configuredRedirect) {
+    return `${window.location.origin}/`;
+  }
+
+  try {
+    const configuredUrl = new URL(configuredRedirect);
+    const currentUrl = new URL(window.location.href);
+    const shouldNormalizeLoopbackHost =
+      configuredUrl.port === currentUrl.port
+      && isLoopbackHost(configuredUrl.hostname)
+      && isLoopbackHost(currentUrl.hostname)
+      && configuredUrl.origin !== currentUrl.origin;
+
+    if (shouldNormalizeLoopbackHost) {
+      return `${currentUrl.origin}${configuredUrl.pathname}${configuredUrl.search}${configuredUrl.hash}`;
+    }
+  } catch {
+    return configuredRedirect;
+  }
+
+  return configuredRedirect;
 }
 
 export function hasSpotifyConfig() {
@@ -233,7 +258,8 @@ export async function handleSpotifyRedirect() {
 
   url.searchParams.delete('code');
   url.searchParams.delete('state');
-  window.history.replaceState({}, document.title, '/');
+  const nextPath = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState({}, document.title, nextPath || '/');
   return exchangeCodeForTokens(code);
 }
 
@@ -256,11 +282,63 @@ export async function getValidAccessToken() {
   }
 
   if (!auth.refreshToken) {
-    return auth.accessToken;
+    writeAuth(null);
+    return null;
   }
 
   const refreshed = await refreshAccessToken(auth.refreshToken);
   return refreshed.accessToken;
+}
+
+type SpotifyDevice = {
+  id: string;
+  is_active: boolean;
+  is_restricted: boolean;
+};
+
+type DevicesResponse = {
+  devices: SpotifyDevice[];
+};
+
+async function fetchPlaybackDevices(accessToken: string): Promise<SpotifyDevice[]> {
+  const response = await fetch(`${SPOTIFY_API_BASE}/me/player/devices`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = (await response.json()) as DevicesResponse;
+  return data.devices ?? [];
+}
+
+async function ensurePlaybackDevice(accessToken: string, preferredDeviceId: string | null): Promise<string | null> {
+  const devices = await fetchPlaybackDevices(accessToken);
+  const availableDevices = devices.filter((device) => !device.is_restricted);
+
+  if (availableDevices.length === 0) {
+    return null;
+  }
+
+  const preferred = preferredDeviceId ? availableDevices.find((device) => device.id === preferredDeviceId) : null;
+  if (preferred) {
+    if (!preferred.is_active) {
+      await transferPlaybackToDevice(preferred.id, false);
+    }
+    return preferred.id;
+  }
+
+  const activeDevice = availableDevices.find((device) => device.is_active);
+  if (activeDevice) {
+    return activeDevice.id;
+  }
+
+  const fallbackDevice = availableDevices[0];
+  await transferPlaybackToDevice(fallbackDevice.id, false);
+  return fallbackDevice.id;
 }
 
 export async function fetchCurrentPlayback(): Promise<PlaybackSnapshot | null> {
@@ -300,7 +378,7 @@ export async function fetchCurrentPlayback(): Promise<PlaybackSnapshot | null> {
   };
 }
 
-export async function transferPlaybackToDevice(deviceId: string) {
+export async function transferPlaybackToDevice(deviceId: string, play = false) {
   const accessToken = await getValidAccessToken();
   if (!accessToken) {
     throw new Error('No active Spotify session');
@@ -312,7 +390,7 @@ export async function transferPlaybackToDevice(deviceId: string) {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ device_ids: [deviceId], play: true }),
+    body: JSON.stringify({ device_ids: [deviceId], play }),
   });
 
   if (!response.ok) {
@@ -535,9 +613,17 @@ export async function queueTrackUri(uri: string, deviceId: string | null): Promi
   const accessToken = await getValidAccessToken();
   if (!accessToken) throw new Error('No active Spotify session');
 
+  const targetDeviceId = await ensurePlaybackDevice(accessToken, deviceId);
+  const currentPlayback = await fetchCurrentPlayback().catch(() => null);
+
+  if (!currentPlayback) {
+    await playTrackUri(uri, targetDeviceId);
+    return;
+  }
+
   const qs = new URLSearchParams({ uri });
-  if (deviceId) {
-    qs.set('device_id', deviceId);
+  if (targetDeviceId) {
+    qs.set('device_id', targetDeviceId);
   }
 
   const response = await fetch(`${SPOTIFY_API_BASE}/me/player/queue?${qs.toString()}`, {
@@ -556,7 +642,8 @@ export async function playTrackUri(uri: string, deviceId: string | null): Promis
   const accessToken = await getValidAccessToken();
   if (!accessToken) throw new Error('No active Spotify session');
 
-  const qs = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+  const targetDeviceId = await ensurePlaybackDevice(accessToken, deviceId);
+  const qs = targetDeviceId ? `?device_id=${encodeURIComponent(targetDeviceId)}` : '';
   const response = await fetch(`${SPOTIFY_API_BASE}/me/player/play${qs}`, {
     method: 'PUT',
     headers: {
