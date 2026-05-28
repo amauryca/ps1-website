@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/spotify-web-playback.d.ts","./src/types.ts","./src/vite-env.d.ts","./src/lib/lyrics.ts","./src/lib/spotify.ts","./src/lib/spotifysdk.ts","./src/lib/usespotifyplayer.ts"],"version":"5.9.3"}
