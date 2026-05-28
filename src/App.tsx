@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { fetchSyncedLyrics } from './lib/lyrics';
 import {
   clearSpotifyAuth,
@@ -37,6 +37,21 @@ type LyricTrackTarget = {
   duration: number;
   uri?: string | null;
 };
+
+type BugReport = {
+  id: string;
+  title: string;
+  details: string;
+  contact: string;
+  createdAt: string;
+  trackTitle: string;
+  trackArtist: string;
+  sourceView: 'song' | 'search' | 'lyrics' | 'report' | 'dev';
+};
+
+const BUG_REPORTS_KEY = 'ps1_bug_reports';
+const DEV_REPORT_PASSWORD = 'devamaury2026';
+const MAX_STORED_REPORTS = 200;
 
 const defaultPalette: Palette = {
   a: 'rgb(166, 39, 75)',
@@ -201,7 +216,7 @@ export default function App() {
   const [liveAnchorPosition, setLiveAnchorPosition] = useState(0);
   const [liveAnchorAtMs, setLiveAnchorAtMs] = useState(0);
   const [palette, setPalette] = useState<Palette>(defaultPalette);
-  const [view, setView] = useState<'song' | 'search' | 'lyrics'>('song');
+  const [view, setView] = useState<'song' | 'search' | 'lyrics' | 'report' | 'dev'>('song');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchArtistResults, setSearchArtistResults] = useState<SearchArtistResult[]>([]);
   const [searchResults, setSearchResults] = useState<SearchTrackResult[]>([]);
@@ -213,6 +228,14 @@ export default function App() {
   const [albumTrackQuery, setAlbumTrackQuery] = useState('');
   const [artistLoading, setArtistLoading] = useState(false);
   const [artistError, setArtistError] = useState('');
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportContact, setReportContact] = useState('');
+  const [reports, setReports] = useState<BugReport[]>([]);
+  const [reportSubmitMessage, setReportSubmitMessage] = useState('');
+  const [devPasswordInput, setDevPasswordInput] = useState('');
+  const [devUnlocked, setDevUnlocked] = useState(false);
+  const [devAuthError, setDevAuthError] = useState('');
   const [focusMode, setFocusMode] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
@@ -293,6 +316,30 @@ export default function App() {
   }, [connected, player.error, player.ready, player.webPlaybackUnavailable]);
 
   useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(BUG_REPORTS_KEY);
+      if (!saved) {
+        return;
+      }
+
+      const parsed = JSON.parse(saved) as BugReport[];
+      if (Array.isArray(parsed)) {
+        setReports(parsed);
+      }
+    } catch {
+      // Ignore invalid local report cache.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(BUG_REPORTS_KEY, JSON.stringify(reports));
+    } catch {
+      // Ignore quota/storage errors.
+    }
+  }, [reports]);
+
+  useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') {
         return;
@@ -302,6 +349,22 @@ export default function App() {
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  useEffect(() => {
+    function handleSecretDevShortcut(event: KeyboardEvent) {
+      const isShortcut = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'd';
+      if (!isShortcut) {
+        return;
+      }
+
+      event.preventDefault();
+      setView('dev');
+      setDevAuthError('');
+    }
+
+    window.addEventListener('keydown', handleSecretDevShortcut);
+    return () => window.removeEventListener('keydown', handleSecretDevShortcut);
   }, []);
 
   useEffect(() => {
@@ -700,6 +763,54 @@ export default function App() {
     }
   }
 
+  function handleSubmitBugReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedTitle = reportTitle.trim();
+    const trimmedDetails = reportDetails.trim();
+    const trimmedContact = reportContact.trim();
+
+    if (!trimmedTitle || !trimmedDetails) {
+      setReportSubmitMessage('Please provide both a title and details.');
+      return;
+    }
+
+    const newReport: BugReport = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: trimmedTitle,
+      details: trimmedDetails,
+      contact: trimmedContact,
+      createdAt: new Date().toISOString(),
+      trackTitle: activeTrack.title,
+      trackArtist: activeTrack.artist,
+      sourceView: view,
+    };
+
+    setReports((current) => [newReport, ...current].slice(0, MAX_STORED_REPORTS));
+    setReportTitle('');
+    setReportDetails('');
+    setReportContact('');
+    setReportSubmitMessage('Thanks. Your report was saved.');
+  }
+
+  function handleDevUnlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (devPasswordInput === DEV_REPORT_PASSWORD) {
+      setDevUnlocked(true);
+      setDevAuthError('');
+      setDevPasswordInput('');
+      return;
+    }
+
+    setDevAuthError('Incorrect password.');
+  }
+
+  function handleDevLock() {
+    setDevUnlocked(false);
+    setDevAuthError('');
+    setDevPasswordInput('');
+    setView('report');
+  }
+
   const filteredAlbumTracks = useMemo(() => {
     const normalizedQuery = albumTrackQuery.trim().toLowerCase();
     if (!normalizedQuery) {
@@ -814,7 +925,7 @@ export default function App() {
             <span>{status}</span>
           </div>
           <div className="view-tabs" role="tablist">
-            {(['song', 'search', 'lyrics'] as const).map((tab) => (
+            {(['song', 'search', 'lyrics', 'report'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -823,7 +934,13 @@ export default function App() {
                 className={`view-tab${view === tab ? ' active' : ''}`}
                 onClick={() => setView(tab)}
               >
-                {tab === 'song' ? 'Song only' : tab === 'search' ? 'Search' : 'Lyrics'}
+                {tab === 'song'
+                  ? 'Song only'
+                  : tab === 'search'
+                    ? 'Search'
+                    : tab === 'lyrics'
+                      ? 'Lyrics'
+                      : 'Report'}
               </button>
             ))}
           </div>
@@ -838,7 +955,101 @@ export default function App() {
         </div>
       </header>
 
-      {view === 'song' ? (
+      {view === 'report' ? (
+        <main className="report-screen">
+          <section className="report-panel">
+            <p className="search-section-label">Bug Report</p>
+            <h2>Send A Report</h2>
+            <p className="report-hint">Tell us what broke, what you expected, and what happened instead.</p>
+            <form className="report-form" onSubmit={handleSubmitBugReport}>
+              <label className="report-label" htmlFor="report-title">Title</label>
+              <input
+                id="report-title"
+                className="report-input"
+                value={reportTitle}
+                onChange={(event) => setReportTitle(event.currentTarget.value)}
+                placeholder="Short summary"
+                maxLength={120}
+              />
+
+              <label className="report-label" htmlFor="report-details">Details</label>
+              <textarea
+                id="report-details"
+                className="report-textarea"
+                value={reportDetails}
+                onChange={(event) => setReportDetails(event.currentTarget.value)}
+                placeholder="Steps to reproduce, errors, and device/browser"
+                rows={7}
+              />
+
+              <label className="report-label" htmlFor="report-contact">Contact (optional)</label>
+              <input
+                id="report-contact"
+                className="report-input"
+                value={reportContact}
+                onChange={(event) => setReportContact(event.currentTarget.value)}
+                placeholder="Email or @handle"
+                maxLength={120}
+              />
+
+              <div className="report-meta">
+                <span>Current track: {activeTrack.title} - {activeTrack.artist}</span>
+                <button type="submit" className="report-submit">Submit Report</button>
+              </div>
+            </form>
+            {reportSubmitMessage && <p className="report-feedback">{reportSubmitMessage}</p>}
+            <p className="report-secret-hint">Dev portal shortcut: Ctrl/Cmd + Shift + D</p>
+          </section>
+        </main>
+      ) : view === 'dev' ? (
+        <main className="report-screen">
+          <section className="report-panel dev-panel">
+            <p className="search-section-label">Developer Reports</p>
+            <h2>Hidden Reports Console</h2>
+            {!devUnlocked ? (
+              <form className="report-form" onSubmit={handleDevUnlock}>
+                <label className="report-label" htmlFor="dev-password">Password</label>
+                <input
+                  id="dev-password"
+                  type="password"
+                  className="report-input"
+                  value={devPasswordInput}
+                  onChange={(event) => setDevPasswordInput(event.currentTarget.value)}
+                  placeholder="Enter dev password"
+                />
+                <div className="report-meta">
+                  <span className="report-hint">Only for maintainers.</span>
+                  <button type="submit" className="report-submit">Unlock</button>
+                </div>
+                {devAuthError && <p className="report-feedback">{devAuthError}</p>}
+              </form>
+            ) : (
+              <>
+                <div className="dev-toolbar">
+                  <span>{reports.length} saved report(s)</span>
+                  <button type="button" className="report-submit secondary" onClick={handleDevLock}>Lock</button>
+                </div>
+                {reports.length === 0 ? (
+                  <p className="report-hint">No reports yet.</p>
+                ) : (
+                  <div className="dev-report-list">
+                    {reports.map((report) => (
+                      <article key={report.id} className="dev-report-card">
+                        <h3>{report.title}</h3>
+                        <p className="dev-report-meta">
+                          {new Date(report.createdAt).toLocaleString()} | Track: {report.trackTitle} - {report.trackArtist} | View: {report.sourceView}
+                        </p>
+                        <p>{report.details}</p>
+                        {report.contact && <p className="dev-report-contact">Contact: {report.contact}</p>}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </main>
+      ) : view === 'song' ? (
         <main className="player-screen">
           <div className="player-card">
             <div className="artwork-wrap">
