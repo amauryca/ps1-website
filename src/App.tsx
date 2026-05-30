@@ -936,6 +936,9 @@ export default function App() {
         ['--mesh-a' as string]: palette.a,
         ['--mesh-b' as string]: palette.b,
         ['--mesh-c' as string]: palette.c,
+        ['--bg-a' as string]: palette.a,
+        ['--bg-b' as string]: palette.b,
+        ['--bg-c' as string]: palette.c,
       }}
     >
       <div className="mesh" />
